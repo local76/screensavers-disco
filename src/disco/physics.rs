@@ -1,6 +1,6 @@
-use library::core::TerminalCell;
+﻿use library::core::TerminalCell;
 use library::core::LcgRng;
-use library::platform::native::sys_info::get_system_info;
+use library::toolkit::sys_info::get_system_info;
 use library::core::logo_block::render_logo_block;
 
 use crate::disco::types::NEON_COLORS;
