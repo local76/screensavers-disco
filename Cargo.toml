@@ -7,10 +7,10 @@ autobins = false
 
 [[bin]]
 name = "disco"
-path = "src/screensaver_shim.rs"
+path = "src/main.rs"
 
 [dependencies]
-library = { git = "https://github.com/local76/library.git", branch = "main", features = ["screensaver-runtime"] }
+library = { git = "https://github.com/local76/library.git", branch = "main" }
 
 [build-dependencies]
 library = { git = "https://github.com/local76/library.git", branch = "main" }
@@ -49,3 +49,5 @@ assets = [
     { source = "assets/scene-disco.desktop", dest = "/usr/share/applications/scene-disco.desktop", mode = "644" },
     { source = "assets/scene-disco.xml", dest = "/usr/share/xscreensaver/config/scene-disco.xml", mode = "644" }
 ]
+[patch."https://github.com/local76/library.git"]
+library = { path = "../library" }
