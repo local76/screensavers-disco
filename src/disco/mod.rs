@@ -9,8 +9,6 @@ use library::core::{LcgRng, TerminalCell};
 use std::time::Duration;
 use library::core::screensaver::Screensaver;
 use library::platform::native::sys_info::get_system_info;
-use library::toolkit::rgb_controller::{RgbController, is_openrgb_enabled};
-use library::toolkit::rgb_protocol::RgbColor;
 
 pub struct Disco {
     pub(crate) rng: LcgRng,
@@ -28,8 +26,6 @@ pub struct Disco {
     pub(crate) mem_pressure: f32,
     pub(crate) cpu_load: f32,
     pub(crate) host_bias: f32,
-    pub(crate) rgb: Option<RgbController>,
-    pub(crate) rgb_timer: f32,
 }
 
 impl Default for Disco {
@@ -60,8 +56,6 @@ impl Disco {
             mem_pressure: sys.mem_used_pct / 100.0,
             cpu_load: 0.4,
             host_bias,
-            rgb: if is_openrgb_enabled() { Some(RgbController::new()) } else { None },
-            rgb_timer: 0.0,
         }
     }
 }
@@ -84,42 +78,7 @@ impl Screensaver for Disco {
         let audio_vol = self.audio_visualizer.get_volume();
 
         // OpenRGB audio visualizer updates
-        self.rgb_timer += delta;
-        if self.rgb_timer >= 0.06 {
-            self.rgb_timer = 0.0;
-            if let Some(ref r) = self.rgb {
-
-                // Beat detection: trigger a flash if there's a loud beat
-                if audio_vol > 0.4 {
-                    let color_idx = self.rng.next_usize(types::NEON_COLORS.len());
-                    let base_c = types::NEON_COLORS[color_idx];
-                    let flash_color = RgbColor::new(base_c.0, base_c.1, base_c.2);
-                    r.flash(flash_color, Duration::from_millis(150));
-                } else {
-                    // Continuous visualizer: cycle neon colors modulated by volume
-                    let vol_factor = (audio_vol * 1.5 + 0.15).clamp(0.15, 1.0);
-                    let get_party_color = |offset: usize, time_scale: f32| -> RgbColor {
-                        let color_idx = ((self.time_elapsed * time_scale) as usize + offset) % types::NEON_COLORS.len();
-                        let base_c = types::NEON_COLORS[color_idx];
-                        RgbColor::new(
-                            (base_c.0 as f32 * vol_factor) as u8,
-                            (base_c.1 as f32 * vol_factor) as u8,
-                            (base_c.2 as f32 * vol_factor) as u8,
-                        )
-                    };
-                    
-                    r.set_device_color(5, get_party_color(0, 3.0));
-                    r.set_device_color(6, get_party_color(1, 3.0));
-                    r.set_device_color(12, get_party_color(2, 3.0));
-                    let c_internal = get_party_color(3, 3.0);
-                    r.set_device_color(0, c_internal);
-                    r.set_device_color(1, c_internal);
-                    r.set_device_color(2, c_internal);
-                }
-            }
-        }
-
-        // Excite background stars randomly if audio is loud
+// Excite background stars randomly if audio is loud
         if audio_vol > 0.05 {
             for star in &mut self.stars {
                 if self.rng.next_bool(0.0006 * audio_vol) {
