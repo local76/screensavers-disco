@@ -183,22 +183,26 @@ pub fn draw_disco(disco: &Disco, grid: &mut [TerminalCell], cols: usize, rows: u
         for dy in -radius_y..=radius_y {
             let width_at_y = (radius_x as f32 * (1.0 - (dy as f32 / radius_y as f32).powi(2)).max(0.0).sqrt()).round() as i32;
             for dx in -width_at_y..=width_at_y {
-                let sx = (disco_x as i32 + dx) as usize;
-                let sy = (disco_y as i32 + dy) as usize;
-                if sx < cols && sy < rows {
-                    let pattern_idx = ((dx + dy + rot_offset).abs() % 4) as usize;
-                    let ch = disc_chars[pattern_idx];
-                    let dist_center = (dx as f32).powi(2) + (dy as f32 * 1.8).powi(2);
-                    let fg = if dist_center < 3.0 {
-                        (255, 255, 255) // White hotspot
-                    } else if dist_center < 9.0 {
-                        (200, 220, 255) // Bright Silver
-                    } else {
-                        (100, 110, 130) // Silver/Gray
-                    };
-                    let idx = sy * cols + sx;
-                    grid[idx].ch = ch;
-                    grid[idx].fg = fg;
+                let sx_i = disco_x as i32 + dx;
+                let sy_i = disco_y as i32 + dy;
+                if sx_i >= 0 && sy_i >= 0 {
+                    let sx = sx_i as usize;
+                    let sy = sy_i as usize;
+                    if sx < cols && sy < rows {
+                        let pattern_idx = ((dx + dy + rot_offset).abs() % 4) as usize;
+                        let ch = disc_chars[pattern_idx];
+                        let dist_center = (dx as f32).powi(2) + (dy as f32 * 1.8).powi(2);
+                        let fg = if dist_center < 3.0 {
+                            (255, 255, 255) // White hotspot
+                        } else if dist_center < 9.0 {
+                            (200, 220, 255) // Bright Silver
+                        } else {
+                            (100, 110, 130) // Silver/Gray
+                        };
+                        let idx = sy * cols + sx;
+                        grid[idx].ch = ch;
+                        grid[idx].fg = fg;
+                    }
                 }
             }
         }
@@ -258,20 +262,22 @@ pub fn draw_disco(disco: &Disco, grid: &mut [TerminalCell], cols: usize, rows: u
 
     // 6. Exploding Neon Confetti Particles
     for c in &disco.confetti {
-        let px = c.x as usize;
-        let py = c.y as usize;
-        if px < cols && py < rows {
-            let life_pct = c.lifetime / c.max_lifetime;
-            let col = (
-                (c.color.0 as f32 * life_pct) as u8,
-                (c.color.1 as f32 * life_pct) as u8,
-                (c.color.2 as f32 * life_pct) as u8,
-            );
-            let idx = py * cols + px;
-            let current_ch = grid[idx].ch;
-            if current_ch == ' ' || current_ch == '─' || current_ch == '│' || current_ch == '+' || current_ch == '.' || current_ch == '*' {
-                grid[idx].ch = c.ch;
-                grid[idx].fg = col;
+        if c.x >= 0.0 && c.y >= 0.0 {
+            let px = c.x as usize;
+            let py = c.y as usize;
+            if px < cols && py < rows {
+                let life_pct = c.lifetime / c.max_lifetime;
+                let col = (
+                    (c.color.0 as f32 * life_pct) as u8,
+                    (c.color.1 as f32 * life_pct) as u8,
+                    (c.color.2 as f32 * life_pct) as u8,
+                );
+                let idx = py * cols + px;
+                let current_ch = grid[idx].ch;
+                if current_ch == ' ' || current_ch == '─' || current_ch == '│' || current_ch == '+' || current_ch == '.' || current_ch == '*' {
+                    grid[idx].ch = c.ch;
+                    grid[idx].fg = col;
+                }
             }
         }
     }
