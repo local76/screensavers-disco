@@ -3,10 +3,9 @@
     windows_subsystem = "windows"
 )]
 
-mod runner;
 mod disco;
 
 fn main() {
     let effect = disco::Disco::new();
-    runner::run_main(effect, "disco");
+    library::screensaver_runner::run_main(effect, "disco");
 }
