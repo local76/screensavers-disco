@@ -31,9 +31,10 @@ depends = "libc6, xterm"
 section = "utils"
 priority = "optional"
 assets = [
-    ["target/release/disco", "usr/libexec/screensaver-shims/disco", "755"],
-    ["assets/scene-disco.desktop", "usr/share/applications/scene-disco.desktop", "644"],
-    ["assets/scene-disco.xml", "usr/share/xscreensaver/config/scene-disco.xml", "644"]
+    ["target/release/disco", "usr/libexec/local76/screensavers/disco", "755"],
+    ["assets/local76-disco.desktop", "usr/share/applications/local76-disco.desktop", "644"],
+    ["assets/local76-disco.xml", "usr/share/xscreensaver/config/local76-disco.xml", "644"],
+    ["assets/local76-disco.png", "usr/share/pixmaps/local76-disco.png", "644"]
 ]
 
 [package.metadata.generate-rpm]
@@ -45,9 +46,10 @@ summary = "disco - retro terminal screensaver effect"
 description = "Screensaver effect (disco) part of the screensavers collection."
 license = "MIT"
 assets = [
-    { source = "target/release/disco", dest = "/usr/libexec/screensaver-shims/disco", mode = "755" },
-    { source = "assets/scene-disco.desktop", dest = "/usr/share/applications/scene-disco.desktop", mode = "644" },
-    { source = "assets/scene-disco.xml", dest = "/usr/share/xscreensaver/config/scene-disco.xml", mode = "644" }
+    { source = "target/release/disco", dest = "/usr/libexec/local76/screensavers/disco", mode = "755" },
+    { source = "assets/local76-disco.desktop", dest = "/usr/share/applications/local76-disco.desktop", mode = "644" },
+    { source = "assets/local76-disco.xml", dest = "/usr/share/xscreensaver/config/local76-disco.xml", mode = "644" },
+    { source = "assets/local76-disco.png", dest = "/usr/share/pixmaps/local76-disco.png", mode = "644" }
 ]
 [patch."https://github.com/local76/library.git"]
 library = { path = "../library" }

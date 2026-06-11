@@ -1,4 +1,4 @@
-﻿//! Consolidated disco screensaver effect module.
+//! Consolidated disco screensaver effect module.
 //!
 //! **Taxonomy Classification**: System Role (Purpose - Application Software).
 
@@ -25,7 +25,11 @@ pub struct Disco {
     pub(crate) sys_refresh_timer: f32,
     pub(crate) mem_pressure: f32,
     pub(crate) cpu_load: f32,
-    pub(crate) host_bias: f32,
+    pub(crate) _host_bias: f32,
+    pub(super) on_battery: bool,
+    pub(super) frame_time_ema: f32,
+    pub(super) quality_scale: f32,
+    pub(super) target_frame_time: f32,
 }
 
 impl Default for Disco {
@@ -41,6 +45,7 @@ impl Disco {
 
         let sys = get_system_info();
         let host_bias = sys.hostname.chars().map(|c| c as u32).sum::<u32>() as f32 / 1000.0 % 1.0;
+        let on_battery = sys.power_status.contains("Battery");
 
         Self {
             rng: LcgRng::new(4321),
@@ -54,31 +59,57 @@ impl Disco {
             disco_ball_opt,
             sys_refresh_timer: 0.0,
             mem_pressure: sys.mem_used_pct / 100.0,
-            cpu_load: 0.4,
-            host_bias,
+            cpu_load: (sys.cpu_usage_pct / 100.0).clamp(0.0, 1.0),
+            _host_bias: host_bias,
+            on_battery,
+            frame_time_ema: 0.01666667,
+            quality_scale: 1.0,
+            target_frame_time: 0.01666667,
         }
     }
 }
 
 impl Screensaver for Disco {
     fn update(&mut self, dt: Duration, cols: usize, rows: usize) {
-        let delta = dt.as_secs_f32();
+        let dt_secs = dt.as_secs_f32();
+
+        // Auto-detect high refresh rates during the startup phase
+        if self.time_elapsed < 2.0 && dt_secs > 0.001 {
+            if dt_secs < self.target_frame_time - 0.001 {
+                self.target_frame_time = dt_secs;
+            }
+        }
+
+        // Exponential moving average for frame time (alpha = 0.1)
+        self.frame_time_ema = self.frame_time_ema * 0.9 + dt_secs.min(0.2) * 0.1;
+
+        let speed_mult = if self.on_battery { 0.65 } else { 1.0 };
+        let delta = dt_secs * speed_mult;
         self.time_elapsed += delta;
+
+        // Adjust quality_scale based on frame time performance vs target
+        if self.time_elapsed > 1.5 {
+            if self.frame_time_ema > self.target_frame_time * 1.15 {
+                self.quality_scale = (self.quality_scale - 0.15 * delta).max(0.20);
+            } else if self.frame_time_ema < self.target_frame_time * 1.05 {
+                self.quality_scale = (self.quality_scale + 0.04 * delta).min(1.0);
+            }
+        }
 
         // Live: system load drives the party intensity (pulses, more confetti)
         self.sys_refresh_timer += delta;
         if self.sys_refresh_timer >= 1.0 {
             let sys = get_system_info();
             self.mem_pressure = sys.mem_used_pct / 100.0;
-            self.cpu_load = (self.mem_pressure * 0.6 + 0.3).min(0.9);
-            if self.host_bias > 0.55 { self.cpu_load = (self.cpu_load + 0.1).min(0.98); }
+            self.cpu_load = (sys.cpu_usage_pct / 100.0).clamp(0.0, 1.0);
+            self.on_battery = sys.power_status.contains("Battery");
             self.sys_refresh_timer = 0.0;
         }
 
         let audio_vol = self.audio_visualizer.get_volume();
 
         // OpenRGB audio visualizer updates
-// Excite background stars randomly if audio is loud
+        // Excite background stars randomly if audio is loud
         if audio_vol > 0.05 {
             for star in &mut self.stars {
                 if self.rng.next_bool(0.0006 * audio_vol) {
@@ -88,17 +119,26 @@ impl Screensaver for Disco {
             }
         }
 
-        // Initialize confetti and stars if resized or not created
+        // Initialize grid size trackers if resized
         if cols != self.last_cols || rows != self.last_rows {
-            // Live load = bigger party
-            let load_mult = 1.0 + self.cpu_load * 0.8;
-            let target_confetti = (match self.confetti_density_opt {
-                0 => 20,
-                2 => 150,
-                _ => 60,
-            } as f32 * load_mult) as usize;
             self.confetti.clear();
-            for _ in 0..target_confetti {
+            self.stars.clear();
+            self.last_cols = cols;
+            self.last_rows = rows;
+        }
+
+        // Live load = bigger party
+        let load_mult = 1.0 + self.cpu_load * 0.8;
+        let target_confetti = ((match self.confetti_density_opt {
+            0 => 20,
+            2 => 150,
+            _ => 60,
+        } as f32 * load_mult) * self.quality_scale * (if self.on_battery { 0.55 } else { 1.0 })) as usize;
+
+        if self.confetti.len() > target_confetti {
+            self.confetti.truncate(target_confetti);
+        } else if self.confetti.len() < target_confetti && target_confetti > 0 {
+            while self.confetti.len() < target_confetti {
                 let max_lt = self.rng.next_range(0.5, 2.0);
                 self.confetti.push(types::Confetti {
                     x: 0.0,
@@ -111,13 +151,16 @@ impl Screensaver for Disco {
                     max_lifetime: max_lt,
                 });
             }
+        }
 
-            self.stars.clear();
-            let target_stars = (cols * rows / 20).clamp(20, 90);
-            let disco_xf = cols as f32 / 2.0;
-            let disco_yf = 4.0f32;
+        let target_stars = (((cols * rows / 20).clamp(20, 90)) as f32 * self.quality_scale * (if self.on_battery { 0.55 } else { 1.0 })) as usize;
+        let disco_xf = cols as f32 / 2.0;
+        let disco_yf = 4.0f32;
 
-            for i in 0..target_stars {
+        if self.stars.len() > target_stars {
+            self.stars.truncate(target_stars);
+        } else if self.stars.len() < target_stars && target_stars > 0 {
+            while self.stars.len() < target_stars {
                 let sx = self.rng.next_f32();
                 let sy = self.rng.next_f32();
                 let star_xf = sx * cols as f32;
@@ -131,16 +174,13 @@ impl Screensaver for Disco {
                     x: sx,
                     y: sy,
                     phase: self.rng.next_f32() * std::f32::consts::TAU,
-                    ch: if i % 8 == 0 { '✦' } else if i % 3 == 0 { '•' } else { '.' },
+                    ch: if self.stars.len() % 8 == 0 { '✦' } else if self.stars.len() % 3 == 0 { '•' } else { '.' },
                     excitation: 0.0,
                     angle_to_disco: angle,
                     dist_to_disco: dist,
                     color: (255, 255, 255),
                 });
             }
-
-            self.last_cols = cols;
-            self.last_rows = rows;
         }
 
         let disco_x = cols as f32 / 2.0;
